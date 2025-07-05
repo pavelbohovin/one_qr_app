@@ -1,0 +1,100 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.packages
+.pub/
+build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# O/S related
+.DS_Store
+.idea/
+.vscode/
+
+# Android related
+android/.gradle/
+android/captures/
+android/app/build/
+
+# iOS related
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/build/
+
+# Web related
+web/.dart_tool/
+web/build/
+
+# Linux related
+linux/build/
+
+# Windows related
+windows/build/
+
+# macOS related
+macos/build/
+macos/Pods/
+
+# Other
+*.iml
+*.ipr
+*.iws
+*.swp
+*.lock
+
+# Flutter generated files
+.flutter-plugins
+default.xml
+.flutter-plugins-dependencies
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Local env
+.env
+
+# Crashlytics
+crashlytics-build.properties
+
+# Firebase
+firebase_app_id_file.json
+
+# Coverage
+coverage/
