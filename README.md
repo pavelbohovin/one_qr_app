@@ -52,3 +52,9 @@ flutter build ios --release
 4. Build for production with `flutter build apk` or `flutter build ios`
 
 When you open the app, tap the upload button to pick any image (such as a QR code) from your device. The app will always display the last image you picked, even after closing and reopening.
+
+## License
+
+This project is **Open Source** and licensed under the [GNU General Public License v3.0 (GPLv3)](LICENSE).
+
+You are free to use, modify, and distribute this software under the terms of the GPLv3.
