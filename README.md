@@ -1,3 +1,5 @@
+![One QR App Use Case Demo](assets/one-qr-use-case.gif)
+
 # One QR App
 
 A fast, lightweight Flutter app that displays a single QR code image immediately when opened. Perfect for coworking spaces, supermarkets, events, or any situation where you need instant QR code access.
