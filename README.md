@@ -57,8 +57,8 @@ When you open the app, tap the upload button to pick any image (such as a QR cod
 
 ## License
 
-This project is **Open Source** and licensed under the [GNU General Public License v3.0 (GPLv3)](LICENSE).
+This project is **Open Source** and licensed under the [MIT License](LICENSE).
 
-You are free to use, modify, and distribute this software under the terms of the GPLv3.
+You are free to use, modify, and distribute this software under the terms of the MIT License.
 
 Made with ❤️ by NI and AI
