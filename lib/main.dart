@@ -170,7 +170,7 @@ class QRImagePage extends StatefulWidget {
   State<QRImagePage> createState() => _QRImagePageState();
 }
 
-class _QRImagePageState extends State<QRImagePage> {
+class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin {
   File? _imageFile;
   static const String _imagePathKey = 'last_qr_image_path';
   static const String _zoomScaleKey = 'last_zoom_scale';
@@ -233,6 +233,129 @@ class _QRImagePageState extends State<QRImagePage> {
     _saveZoomState();
   }
 
+  void _onDoubleTapDown(TapDownDetails details) {
+    if (_currentScale <= 1.0) {
+      // Zoom in by 50% to the tapped point
+      final newScale = _currentScale * 1.5;
+      _animateToScaleAtPoint(newScale, details.localPosition);
+    } else {
+      // Zoom out to initial state
+      _animateToScale(1.0);
+    }
+  }
+
+  void _animateToScale(double targetScale) {
+    final animation = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    final animationCurve = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeInOut,
+    );
+
+    final initialScale = _currentScale;
+    final initialOffset = _currentOffset;
+
+    animation.addListener(() {
+      final progress = animationCurve.value;
+      
+      // Interpolate scale
+      final interpolatedScale = initialScale + (targetScale - initialScale) * progress;
+      
+      // Interpolate offset (only when zooming out to reset position)
+      final interpolatedOffset = targetScale == 1.0 
+          ? Offset.lerp(initialOffset, Offset.zero, progress)!
+          : initialOffset;
+      
+      // Create interpolated matrix
+      final interpolatedMatrix = Matrix4.identity()
+        ..translate(interpolatedOffset.dx, interpolatedOffset.dy)
+        ..scale(interpolatedScale);
+      
+      _transformationController.value = interpolatedMatrix;
+    });
+
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          _currentScale = targetScale;
+          if (targetScale == 1.0) {
+            _currentOffset = Offset.zero;
+          }
+        });
+        _saveZoomState();
+        animation.dispose();
+      }
+    });
+
+    animation.forward();
+  }
+
+  void _animateToScaleAtPoint(double targetScale, Offset tapPoint) {
+    final animation = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    final animationCurve = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeInOut,
+    );
+
+    final initialScale = _currentScale;
+    final initialOffset = _currentOffset;
+
+    // Get the current widget size to calculate proper coordinates
+    final RenderBox renderBox = context.findRenderObject() as RenderBox;
+    final widgetSize = renderBox.size;
+    
+    // Calculate the center of the widget
+    final widgetCenter = Offset(widgetSize.width / 2, widgetSize.height / 2);
+    
+    // Calculate the tap point relative to the widget center
+    final tapPointFromCenter = tapPoint - widgetCenter;
+    
+    // To center the tapped point, we need to move the image so that the tapped point
+    // becomes the center of the view. The offset should be the negative of the tap point
+    // multiplied by the scale factor
+    final targetOffset = Offset(
+      -tapPointFromCenter.dx * targetScale,
+      -tapPointFromCenter.dy * targetScale,
+    );
+
+    animation.addListener(() {
+      final progress = animationCurve.value;
+      
+      // Interpolate scale
+      final interpolatedScale = initialScale + (targetScale - initialScale) * progress;
+      
+      // Interpolate offset
+      final interpolatedOffset = Offset.lerp(initialOffset, targetOffset, progress)!;
+      
+      // Create interpolated matrix
+      final interpolatedMatrix = Matrix4.identity()
+        ..translate(interpolatedOffset.dx, interpolatedOffset.dy)
+        ..scale(interpolatedScale);
+      
+      _transformationController.value = interpolatedMatrix;
+    });
+
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          _currentScale = targetScale;
+          _currentOffset = targetOffset;
+        });
+        _saveZoomState();
+        animation.dispose();
+      }
+    });
+
+    animation.forward();
+  }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -262,7 +385,10 @@ class _QRImagePageState extends State<QRImagePage> {
                 maxScale: 4.0,
                 transformationController: _transformationController,
                 onInteractionUpdate: _onInteractionUpdate,
-                child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
+                child: GestureDetector(
+                  onDoubleTapDown: _onDoubleTapDown,
+                  child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
+                ),
               )
             : Text(AppLocalizations.of(context)!.noQrImageSelected),
       ),
