@@ -1,0 +1,5 @@
+{
+  "@@locale": "ko",
+  "noQrImageSelected": "QR 이미지가 선택되지 않았습니다.",
+  "uploadQrImage": "QR 이미지 업로드"
+} 

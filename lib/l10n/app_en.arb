@@ -1,0 +1,11 @@
+{
+  "@@locale": "en",
+  "noQrImageSelected": "No QR image selected.",
+  "@noQrImageSelected": {
+    "description": "Message shown when no QR image is selected"
+  },
+  "uploadQrImage": "Upload QR Image",
+  "@uploadQrImage": {
+    "description": "Tooltip for the upload button"
+  }
+} 

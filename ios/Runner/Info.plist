@@ -47,5 +47,7 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to select a QR image.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs access to local network for wireless debugging and development.</string>
 </dict>
 </plist>

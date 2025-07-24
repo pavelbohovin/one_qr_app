@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -14,11 +16,148 @@ class OneQRApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'One QR',
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'), // English
+        Locale('en', 'US'), // American English
+        Locale('en', 'GB'), // British English
+        Locale('es'), // Spanish
+        Locale('es', 'MX'), // Mexican Spanish
+        Locale('fr'), // French
+        Locale('fr', 'CA'), // Canadian French
+        Locale('de'), // German
+        Locale('de', 'AT'), // Austrian German
+        Locale('de', 'CH'), // Swiss German
+        Locale('it'), // Italian
+        Locale('it', 'CH'), // Swiss Italian
+        Locale('pt'), // Portuguese
+        Locale('pt', 'BR'), // Brazilian Portuguese
+        Locale('nl'), // Dutch
+        Locale('nl', 'BE'), // Belgian Dutch
+        Locale('sv'), // Swedish
+        Locale('sv', 'FI'), // Finland Swedish
+        Locale('no'), // Norwegian
+        Locale('nb'), // Norwegian Bokmål
+        Locale('nn'), // Norwegian Nynorsk
+        Locale('da'), // Danish
+        Locale('fi'), // Finnish
+        Locale('is'), // Icelandic
+        Locale('fo'), // Faroese
+        Locale('kl'), // Greenlandic
+        Locale('ga'), // Irish
+        Locale('gd'), // Scottish Gaelic
+        Locale('gv'), // Manx
+        Locale('cy'), // Welsh
+        Locale('br'), // Breton
+        Locale('kw'), // Cornish
+        Locale('fy'), // Frisian
+        Locale('lb'), // Luxembourgish
+        Locale('rm'), // Romansh
+        Locale('oc'), // Occitan
+        Locale('ca'), // Catalan
+        Locale('eu'), // Basque
+        Locale('gl'), // Galician
+        Locale('ast'), // Asturian
+        Locale('an'), // Aragonese
+        Locale('mwl'), // Mirandese
+        Locale('lad'), // Ladino
+        Locale('yi'), // Yiddish
+        Locale('ru'), // Russian
+        Locale('uk'), // Ukrainian
+        Locale('be'), // Belarusian
+        Locale('pl'), // Polish
+        Locale('cs'), // Czech
+        Locale('sk'), // Slovak
+        Locale('hr'), // Croatian
+        Locale('sl'), // Slovenian
+        Locale('bg'), // Bulgarian
+        Locale('mk'), // Macedonian
+        Locale('sq'), // Albanian
+        Locale('sr'), // Serbian
+        Locale('bs'), // Bosnian
+        Locale('ro'), // Romanian
+        Locale('mo'), // Moldovan
+        Locale('gag'), // Gagauz
+        Locale('rom'), // Romani
+        Locale('hu'), // Hungarian
+        Locale('et'), // Estonian
+        Locale('lv'), // Latvian
+        Locale('lt'), // Lithuanian
+        Locale('el'), // Greek
+        Locale('tr'), // Turkish
+        Locale('az'), // Azerbaijani
+        Locale('ka'), // Georgian
+        Locale('hy'), // Armenian
+        Locale('kk'), // Kazakh
+        Locale('ky'), // Kyrgyz
+        Locale('uz'), // Uzbek
+        Locale('tg'), // Tajik
+        Locale('tk'), // Turkmen
+        Locale('ug'), // Uyghur
+        Locale('mn'), // Mongolian
+        Locale('bo'), // Tibetan
+        Locale('zh'), // Chinese Simplified
+        Locale('zh', 'TW'), // Chinese Traditional (Taiwan)
+        Locale('zh', 'HK'), // Chinese Traditional (Hong Kong)
+        Locale('ja'), // Japanese
+        Locale('ko'), // Korean
+        Locale('ar'), // Arabic
+        Locale('he'), // Hebrew
+        Locale('fa'), // Persian
+        Locale('ps'), // Pashto
+        Locale('prs'), // Dari
+        Locale('ku'), // Kurdish
+        Locale('bal'), // Balochi
+        Locale('brh'), // Brahui
+        Locale('sd'), // Sindhi
+        Locale('ur'), // Urdu
+        Locale('skr'), // Saraiki
+        Locale('hno'), // Hindko
+        Locale('ks'), // Kashmiri
+        Locale('doi'), // Dogri
+        Locale('kok'), // Konkani
+        Locale('mni'), // Manipuri
+        Locale('sa'), // Sanskrit
+        Locale('hi'), // Hindi
+        Locale('bn'), // Bengali
+        Locale('as'), // Assamese
+        Locale('or'), // Odia
+        Locale('mr'), // Marathi
+        Locale('gu'), // Gujarati
+        Locale('pa'), // Punjabi
+        Locale('ne'), // Nepali
+        Locale('si'), // Sinhala
+        Locale('dv'), // Dhivehi/Maldivian
+        Locale('ta'), // Tamil
+        Locale('te'), // Telugu
+        Locale('ml'), // Malayalam
+        Locale('kn'), // Kannada
+        Locale('tcy'), // Tulu
+        Locale('kfa'), // Kodava
+        Locale('ms'), // Malay
+        Locale('id'), // Indonesian
+        Locale('jv'), // Javanese
+        Locale('su'), // Sundanese
+        Locale('ban'), // Balinese
+        Locale('ace'), // Acehnese
+        Locale('min'), // Minangkabau
+        Locale('th'), // Thai
+        Locale('lo'), // Lao
+        Locale('km'), // Khmer
+        Locale('vi'), // Vietnamese
+        Locale('my'), // Burmese
+        Locale('qu'), // Quechua
+        Locale('am'), // Amharic
+      ],
       home: const QRImagePage(),
     );
   }
@@ -34,11 +173,19 @@ class QRImagePage extends StatefulWidget {
 class _QRImagePageState extends State<QRImagePage> {
   File? _imageFile;
   static const String _imagePathKey = 'last_qr_image_path';
+  static const String _zoomScaleKey = 'last_zoom_scale';
+  static const String _zoomOffsetXKey = 'last_zoom_offset_x';
+  static const String _zoomOffsetYKey = 'last_zoom_offset_y';
+  
+  double _currentScale = 1.0;
+  Offset _currentOffset = Offset.zero;
+  final TransformationController _transformationController = TransformationController();
 
   @override
   void initState() {
     super.initState();
     _loadLastImage();
+    _loadLastZoomState();
   }
 
   Future<void> _loadLastImage() async {
@@ -51,6 +198,41 @@ class _QRImagePageState extends State<QRImagePage> {
     }
   }
 
+  Future<void> _loadLastZoomState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final scale = prefs.getDouble(_zoomScaleKey) ?? 1.0;
+    final offsetX = prefs.getDouble(_zoomOffsetXKey) ?? 0.0;
+    final offsetY = prefs.getDouble(_zoomOffsetYKey) ?? 0.0;
+    
+    setState(() {
+      _currentScale = scale;
+      _currentOffset = Offset(offsetX, offsetY);
+    });
+    
+    // Apply the saved transformation after a short delay to ensure widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _transformationController.value = Matrix4.identity()
+        ..translate(_currentOffset.dx, _currentOffset.dy)
+        ..scale(_currentScale);
+    });
+  }
+
+  Future<void> _saveZoomState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_zoomScaleKey, _currentScale);
+    await prefs.setDouble(_zoomOffsetXKey, _currentOffset.dx);
+    await prefs.setDouble(_zoomOffsetYKey, _currentOffset.dy);
+  }
+
+  void _onInteractionUpdate(ScaleUpdateDetails details) {
+    final matrix = _transformationController.value;
+    setState(() {
+      _currentScale = matrix.getMaxScaleOnAxis();
+      _currentOffset = Offset(matrix.getTranslation().x, matrix.getTranslation().y);
+    });
+    _saveZoomState();
+  }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -58,9 +240,14 @@ class _QRImagePageState extends State<QRImagePage> {
     if (pickedFile != null) {
       setState(() {
         _imageFile = File(pickedFile.path);
+        // Reset zoom when new image is selected
+        _currentScale = 1.0;
+        _currentOffset = Offset.zero;
+        _transformationController.value = Matrix4.identity();
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_imagePathKey, pickedFile.path);
+      await _saveZoomState();
     }
   }
 
@@ -70,14 +257,26 @@ class _QRImagePageState extends State<QRImagePage> {
       backgroundColor: Colors.white,
       body: Center(
         child: _imageFile != null
-            ? Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain)
-            : const Text('No QR image selected.'),
+            ? InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                transformationController: _transformationController,
+                onInteractionUpdate: _onInteractionUpdate,
+                child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
+              )
+            : Text(AppLocalizations.of(context)!.noQrImageSelected),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _pickImage,
+        tooltip: AppLocalizations.of(context)!.uploadQrImage,
         child: const Icon(Icons.upload),
-        tooltip: 'Upload QR Image',
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
   }
 }
