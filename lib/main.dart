@@ -4,6 +4,9 @@ import 'l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
+import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const OneQRApp());
@@ -374,23 +377,135 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     }
   }
 
+  Future<void> _magicCrop() async {
+    if (_imageFile == null) {
+      return;
+    }
+
+    try {
+      final scanner = BarcodeScanner();
+      final inputImage = InputImage.fromFilePath(_imageFile!.path);
+      final barcodes = await scanner.processImage(inputImage);
+      await scanner.close();
+
+      if (barcodes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppLocalizations.of(context)!.noQrImageSelected)),
+          );
+        }
+        return;
+      }
+
+      // Prefer QR codes, otherwise take the first with a bounding box
+      Barcode? target = barcodes.firstWhere(
+        (b) => b.format == BarcodeFormat.qrCode && b.boundingBox != null,
+        orElse: () => barcodes.firstWhere(
+          (b) => b.boundingBox != null,
+          orElse: () => barcodes.first,
+        ),
+      );
+
+      final rect = target.boundingBox;
+      if (rect == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No detectable bounding box.')),
+          );
+        }
+        return;
+      }
+
+      final bytes = await _imageFile!.readAsBytes();
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to decode image.')),
+          );
+        }
+        return;
+      }
+
+      // Add padding around the detected rect
+      const padding = 24;
+      int x = (rect.left - padding).floor();
+      int y = (rect.top - padding).floor();
+      int w = (rect.width + padding * 2).ceil();
+      int h = (rect.height + padding * 2).ceil();
+
+      // Clamp to image bounds
+      x = x.clamp(0, decoded.width - 1);
+      y = y.clamp(0, decoded.height - 1);
+      w = w.clamp(1, decoded.width - x);
+      h = h.clamp(1, decoded.height - y);
+
+      final cropped = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
+      final outDir = await getTemporaryDirectory();
+      final outFile = File(
+        '${outDir.path}/oneqr_crop_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      final outBytes = img.encodeJpg(cropped, quality: 95);
+      await outFile.writeAsBytes(outBytes);
+
+      if (!mounted) return;
+      setState(() {
+        _imageFile = outFile;
+        _currentScale = 1.0;
+        _currentOffset = Offset.zero;
+        _transformationController.value = Matrix4.identity();
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_imagePathKey, outFile.path);
+      await _saveZoomState();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Magic failed: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: _imageFile != null
-            ? InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4.0,
-                transformationController: _transformationController,
-                onInteractionUpdate: _onInteractionUpdate,
-                child: GestureDetector(
-                  onDoubleTapDown: _onDoubleTapDown,
-                  child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
+      body: Stack(
+        children: [
+          Center(
+            child: _imageFile != null
+                ? InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    transformationController: _transformationController,
+                    onInteractionUpdate: _onInteractionUpdate,
+                    child: GestureDetector(
+                      onDoubleTapDown: _onDoubleTapDown,
+                      child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
+                    ),
+                  )
+                : Text(AppLocalizations.of(context)!.noQrImageSelected),
+          ),
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _magicCrop,
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-              )
-            : Text(AppLocalizations.of(context)!.noQrImageSelected),
+                child: const Text('Magic'),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _pickImage,
