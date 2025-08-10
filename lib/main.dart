@@ -19,8 +19,16 @@ class OneQRApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'One QR',
+      themeMode: ThemeMode.system, // Follows system dark/light mode
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
       localizationsDelegates: const [
@@ -501,7 +509,7 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.background,
       body: Stack(
         children: [
           Center(
@@ -516,7 +524,12 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
                       child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
                     ),
                   )
-                : Text(AppLocalizations.of(context)!.noQrImageSelected),
+                : Text(
+                    AppLocalizations.of(context)!.noQrImageSelected,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onBackground,
+                    ),
+                  ),
           ),
           // Scanning line overlay
           if (_showScanningLine)
@@ -541,7 +554,9 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
                 onPressed: _magicCrop,
                 heroTag: "magicCrop",
                 child: Image.asset(
-                  'assets/icons/autocrop_qr_code_icon.png',
+                  Theme.of(context).brightness == Brightness.dark
+                      ? 'assets/icons/autocrop_qr_code_white_icon.png'
+                      : 'assets/icons/autocrop_qr_code_icon.png',
                   width: 32,
                   height: 32,
                 ),
