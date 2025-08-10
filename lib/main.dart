@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 
 void main() {
   runApp(const OneQRApp());
@@ -194,10 +195,12 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
   bool _showScanningLine = false;
   late AnimationController _scanningAnimationController;
   late Animation<double> _scanningAnimation;
+  double? _originalBrightness;
 
   @override
   void initState() {
     super.initState();
+    _setMaxBrightness();
     _scanningAnimationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -211,6 +214,28 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     ));
     _loadLastImage();
     _loadLastZoomState();
+  }
+
+  Future<void> _setMaxBrightness() async {
+    try {
+      // Save original brightness
+      _originalBrightness = await ScreenBrightness().current;
+      // Set to maximum brightness
+      await ScreenBrightness().setScreenBrightness(1.0);
+    } catch (e) {
+      // Handle permission or platform issues
+      print('Failed to set brightness: $e');
+    }
+  }
+
+  Future<void> _restoreBrightness() async {
+    try {
+      if (_originalBrightness != null) {
+        await ScreenBrightness().setScreenBrightness(_originalBrightness!);
+      }
+    } catch (e) {
+      print('Failed to restore brightness: $e');
+    }
   }
 
   Future<void> _loadLastImage() async {
@@ -576,6 +601,7 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
   void dispose() {
     _transformationController.dispose();
     _scanningAnimationController.dispose();
+    _restoreBrightness();
     super.dispose();
   }
 }
