@@ -619,7 +619,7 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
       body: Stack(
         children: [
           Center(
-            child: _imageFile != null
+            child: (_imageFile != null || _svgFilePath != null)
                 ? InteractiveViewer(
                     minScale: 0.5,
                     maxScale: 4.0,
