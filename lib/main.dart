@@ -195,8 +195,11 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
   bool _showScanningLine = false;
   late AnimationController _scanningAnimationController;
   late Animation<double> _scanningAnimation;
+  bool _showFadeOut = false;
+  late AnimationController _fadeOutAnimationController;
+  late Animation<double> _fadeOutAnimation;
+  File? _preCroppedImage;
   double? _originalBrightness;
-  bool _hasQrCode = false;
 
   @override
   void initState() {
@@ -212,6 +215,18 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     ).animate(CurvedAnimation(
       parent: _scanningAnimationController,
       curve: Curves.easeInOut,
+    ));
+    
+    _fadeOutAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeOutAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeOutAnimationController,
+      curve: Curves.easeOut,
     ));
     _loadLastImage();
     _loadLastZoomState();
@@ -239,34 +254,13 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     }
   }
 
-  Future<void> _scanForQrCodes(File imageFile) async {
-    try {
-      final scanner = BarcodeScanner();
-      final inputImage = InputImage.fromFilePath(imageFile.path);
-      final barcodes = await scanner.processImage(inputImage);
-      await scanner.close();
-
-      setState(() {
-        _hasQrCode = barcodes.isNotEmpty;
-      });
-    } catch (e) {
-      print('Failed to scan for QR codes: $e');
-      setState(() {
-        _hasQrCode = false;
-      });
-    }
-  }
-
   Future<void> _loadLastImage() async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString(_imagePathKey);
     if (path != null && File(path).existsSync()) {
-      final file = File(path);
       setState(() {
-        _imageFile = file;
+        _imageFile = File(path);
       });
-      // Scan for QR codes in the loaded image
-      await _scanForQrCodes(file);
     }
   }
 
@@ -433,19 +427,77 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      final file = File(pickedFile.path);
       setState(() {
-        _imageFile = file;
+        _imageFile = File(pickedFile.path);
         // Reset zoom when new image is selected
         _currentScale = 1.0;
         _currentOffset = Offset.zero;
         _transformationController.value = Matrix4.identity();
+        _preCroppedImage = null; // Reset pre-cropped image
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_imagePathKey, pickedFile.path);
       await _saveZoomState();
-      // Scan for QR codes in the new image
-      await _scanForQrCodes(file);
+      
+      // Pre-crop the image in background
+      _preCropImage(File(pickedFile.path));
+    }
+  }
+
+  Future<void> _preCropImage(File imageFile) async {
+    try {
+      final scanner = BarcodeScanner();
+      final inputImage = InputImage.fromFilePath(imageFile.path);
+      final barcodes = await scanner.processImage(inputImage);
+      await scanner.close();
+
+      if (barcodes.isEmpty) return;
+
+      // Prefer QR codes, otherwise take the first with a bounding box
+      Barcode? target = barcodes.firstWhere(
+        (b) => b.format == BarcodeFormat.qrCode && b.boundingBox != null,
+        orElse: () => barcodes.firstWhere(
+          (b) => b.boundingBox != null,
+          orElse: () => barcodes.first,
+        ),
+      );
+
+      final rect = target.boundingBox;
+      if (rect == null) return;
+
+      final bytes = await imageFile.readAsBytes();
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return;
+
+      // Add padding around the detected rect
+      const padding = 24;
+      int x = (rect.left - padding).floor();
+      int y = (rect.top - padding).floor();
+      int w = (rect.width + padding * 2).ceil();
+      int h = (rect.height + padding * 2).ceil();
+
+      // Clamp to image bounds
+      x = x.clamp(0, decoded.width - 1);
+      y = y.clamp(0, decoded.height - 1);
+      w = w.clamp(1, decoded.width - x);
+      h = h.clamp(1, decoded.height - y);
+
+      final cropped = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
+      final outDir = await getTemporaryDirectory();
+      final outFile = File(
+        '${outDir.path}/oneqr_precrop_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      final outBytes = img.encodeJpg(cropped, quality: 95);
+      await outFile.writeAsBytes(outBytes);
+
+      if (mounted) {
+        setState(() {
+          _preCroppedImage = outFile;
+        });
+      }
+    } catch (e) {
+      // Silently handle pre-crop errors
+      print('Pre-crop failed: $e');
     }
   }
 
@@ -465,6 +517,34 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     await Future.delayed(const Duration(milliseconds: 800));
 
     try {
+      // Use pre-cropped image if available, otherwise process normally
+      if (_preCroppedImage != null && _preCroppedImage!.existsSync()) {
+        // Start fade out animation for image and magic button
+        setState(() {
+          _showFadeOut = true;
+        });
+        _fadeOutAnimationController.forward();
+        
+        // Wait for fade out animation to complete
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        if (!mounted) return;
+        setState(() {
+          _imageFile = _preCroppedImage;
+          _currentScale = 1.0;
+          _currentOffset = Offset.zero;
+          _transformationController.value = Matrix4.identity();
+          _showScanningLine = false;
+          _showFadeOut = false;
+        });
+        _fadeOutAnimationController.reset();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_imagePathKey, _preCroppedImage!.path);
+        await _saveZoomState();
+        return;
+      }
+
+      // Fallback to normal processing if pre-cropped image is not available
       final scanner = BarcodeScanner();
       final inputImage = InputImage.fromFilePath(_imageFile!.path);
       final barcodes = await scanner.processImage(inputImage);
@@ -508,6 +588,9 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
       final decoded = img.decodeImage(bytes);
       if (decoded == null) {
         if (mounted) {
+          setState(() {
+            _showScanningLine = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to decode image.')),
           );
@@ -521,6 +604,15 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
       int y = (rect.top - padding).floor();
       int w = (rect.width + padding * 2).ceil();
       int h = (rect.height + padding * 2).ceil();
+
+      // Start fade out animation for image and magic button
+      setState(() {
+        _showFadeOut = true;
+      });
+      _fadeOutAnimationController.forward();
+      
+      // Wait for fade out animation to complete
+      await Future.delayed(const Duration(milliseconds: 300));
 
       // Clamp to image bounds
       x = x.clamp(0, decoded.width - 1);
@@ -543,13 +635,17 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
         _currentOffset = Offset.zero;
         _transformationController.value = Matrix4.identity();
         _showScanningLine = false;
-        _hasQrCode = false; // Cropped image is the QR code itself
+        _showFadeOut = false;
       });
+      _fadeOutAnimationController.reset();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_imagePathKey, outFile.path);
       await _saveZoomState();
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _showScanningLine = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Magic failed: $e')),
         );
@@ -565,15 +661,23 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
         children: [
           Center(
             child: _imageFile != null
-                ? InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    transformationController: _transformationController,
-                    onInteractionUpdate: _onInteractionUpdate,
-                    child: GestureDetector(
-                      onDoubleTapDown: _onDoubleTapDown,
-                      child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
-                    ),
+                ? AnimatedBuilder(
+                    animation: _fadeOutAnimation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _showFadeOut ? _fadeOutAnimation.value : 1.0,
+                        child: InteractiveViewer(
+                          minScale: 0.5,
+                          maxScale: 4.0,
+                          transformationController: _transformationController,
+                          onInteractionUpdate: _onInteractionUpdate,
+                          child: GestureDetector(
+                            onDoubleTapDown: _onDoubleTapDown,
+                            child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
+                          ),
+                        ),
+                      );
+                    },
                   )
                 : Text(
                     AppLocalizations.of(context)!.noQrImageSelected,
@@ -596,30 +700,46 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
                 );
               },
             ),
-          // MagicCrop button - only show when image is selected, not already cropped, and QR codes are detected
-          if (_imageFile != null && !_imageFile!.path.contains('oneqr_crop_') && _hasQrCode)
-            Positioned(
-              left: 16,
-              bottom: 16,
-              child: FloatingActionButton(
-                onPressed: _magicCrop,
-                heroTag: "magicCrop",
-                child: Image.asset(
-                  Theme.of(context).brightness == Brightness.dark
-                      ? 'assets/icons/autocrop_qr_code_white_icon.png'
-                      : 'assets/icons/autocrop_qr_code_icon.png',
-                  width: 32,
-                  height: 32,
-                ),
-              ),
-            ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _pickImage,
-        tooltip: AppLocalizations.of(context)!.uploadQrImage,
-        child: const Icon(Icons.upload),
-      ),
+      floatingActionButton: _imageFile != null && !_imageFile!.path.contains('oneqr_crop_') && !_imageFile!.path.contains('oneqr_precrop_')
+          ? AnimatedBuilder(
+              animation: _fadeOutAnimation,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _showFadeOut ? _fadeOutAnimation.value : 1.0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32.0),
+                        child: FloatingActionButton(
+                          onPressed: _magicCrop,
+                          heroTag: "magicCrop",
+                          child: Image.asset(
+                            Theme.of(context).brightness == Brightness.dark
+                                ? 'assets/icons/autocrop_qr_code_white_icon.png'
+                                : 'assets/icons/autocrop_qr_code_icon.png',
+                            width: 32,
+                            height: 32,
+                          ),
+                        ),
+                      ),
+                      FloatingActionButton(
+                        onPressed: _pickImage,
+                        tooltip: AppLocalizations.of(context)!.uploadQrImage,
+                        child: const Icon(Icons.upload),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            )
+          : FloatingActionButton(
+              onPressed: _pickImage,
+              tooltip: AppLocalizations.of(context)!.uploadQrImage,
+              child: const Icon(Icons.upload),
+            ),
     );
   }
 
@@ -627,6 +747,7 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
   void dispose() {
     _transformationController.dispose();
     _scanningAnimationController.dispose();
+    _fadeOutAnimationController.dispose();
     _restoreBrightness();
     super.dispose();
   }
