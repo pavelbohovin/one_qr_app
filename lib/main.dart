@@ -763,6 +763,30 @@ class ScanningLinePainter extends CustomPainter {
     // Calculate the scanning line position (from top to bottom of screen)
     final lineY = size.height * progress;
     
+    // Draw gradient shadow trailing behind the line
+    final shadowHeight = 80.0;
+    final shadowStartY = lineY - shadowHeight;
+    final shadowEndY = lineY;
+    
+    // Create gradient from blue to transparent
+    final shadowGradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Colors.blue.withOpacity(0.0),
+        Colors.blue.withOpacity(0.4),
+        Colors.blue.withOpacity(0.8),
+      ],
+      stops: const [0.0, 0.5, 1.0],
+    );
+    
+    // Draw gradient shadow rectangle
+    final shadowRect = Rect.fromLTWH(0, shadowStartY, size.width, shadowHeight);
+    final shadowPaint = Paint()
+      ..shader = shadowGradient.createShader(shadowRect);
+    
+    canvas.drawRect(shadowRect, shadowPaint);
+    
     // Draw the scanning line across the full screen width
     final linePaint = Paint()
       ..color = Colors.blue
