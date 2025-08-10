@@ -444,6 +444,24 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     }
   }
 
+  Future<void> _closeImage() async {
+    setState(() {
+      _imageFile = null;
+      _preCroppedImage = null;
+      _currentScale = 1.0;
+      _currentOffset = Offset.zero;
+      _transformationController.value = Matrix4.identity();
+      _showScanningLine = false;
+      _showFadeOut = false;
+    });
+    _fadeOutAnimationController.reset();
+    
+    // Clear saved image path
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_imagePathKey);
+    await _saveZoomState();
+  }
+
   Future<void> _preCropImage(File imageFile) async {
     try {
       final scanner = BarcodeScanner();
@@ -686,6 +704,34 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
                     ),
                   ),
           ),
+          // Close button - only show when image is selected
+          if (_imageFile != null)
+            Positioned(
+              top: 48,
+              right: 16,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  onPressed: _closeImage,
+                  icon: Icon(
+                    Icons.close,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    size: 24,
+                  ),
+                  tooltip: 'Close image',
+                ),
+              ),
+            ),
           // Scanning line overlay
           if (_showScanningLine)
             AnimatedBuilder(
