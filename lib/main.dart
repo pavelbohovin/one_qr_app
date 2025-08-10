@@ -196,6 +196,7 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
   late AnimationController _scanningAnimationController;
   late Animation<double> _scanningAnimation;
   double? _originalBrightness;
+  bool _hasQrCode = false;
 
   @override
   void initState() {
@@ -238,13 +239,34 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     }
   }
 
+  Future<void> _scanForQrCodes(File imageFile) async {
+    try {
+      final scanner = BarcodeScanner();
+      final inputImage = InputImage.fromFilePath(imageFile.path);
+      final barcodes = await scanner.processImage(inputImage);
+      await scanner.close();
+
+      setState(() {
+        _hasQrCode = barcodes.isNotEmpty;
+      });
+    } catch (e) {
+      print('Failed to scan for QR codes: $e');
+      setState(() {
+        _hasQrCode = false;
+      });
+    }
+  }
+
   Future<void> _loadLastImage() async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString(_imagePathKey);
     if (path != null && File(path).existsSync()) {
+      final file = File(path);
       setState(() {
-        _imageFile = File(path);
+        _imageFile = file;
       });
+      // Scan for QR codes in the loaded image
+      await _scanForQrCodes(file);
     }
   }
 
@@ -411,8 +433,9 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
+      final file = File(pickedFile.path);
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _imageFile = file;
         // Reset zoom when new image is selected
         _currentScale = 1.0;
         _currentOffset = Offset.zero;
@@ -421,6 +444,8 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_imagePathKey, pickedFile.path);
       await _saveZoomState();
+      // Scan for QR codes in the new image
+      await _scanForQrCodes(file);
     }
   }
 
@@ -518,6 +543,7 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
         _currentOffset = Offset.zero;
         _transformationController.value = Matrix4.identity();
         _showScanningLine = false;
+        _hasQrCode = false; // Cropped image is the QR code itself
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_imagePathKey, outFile.path);
@@ -570,8 +596,8 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
                 );
               },
             ),
-          // MagicCrop button - only show when image is selected and not already cropped
-          if (_imageFile != null && !_imageFile!.path.contains('oneqr_crop_'))
+          // MagicCrop button - only show when image is selected, not already cropped, and QR codes are detected
+          if (_imageFile != null && !_imageFile!.path.contains('oneqr_crop_') && _hasQrCode)
             Positioned(
               left: 16,
               bottom: 16,
