@@ -7,6 +7,8 @@ import 'dart:io';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 void main() {
   runApp(const OneQRApp());
@@ -175,7 +177,11 @@ class QRImagePage extends StatefulWidget {
 
 class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin {
   File? _imageFile;
+  String? _svgFilePath;
+  bool _isSvg = false;
   static const String _imagePathKey = 'last_qr_image_path';
+  static const String _svgPathKey = 'last_qr_svg_path';
+  static const String _isSvgKey = 'is_svg_file';
   static const String _zoomScaleKey = 'last_zoom_scale';
   static const String _zoomOffsetXKey = 'last_zoom_offset_x';
   static const String _zoomOffsetYKey = 'last_zoom_offset_y';
@@ -207,11 +213,26 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
 
   Future<void> _loadLastImage() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString(_imagePathKey);
-    if (path != null && File(path).existsSync()) {
-      setState(() {
-        _imageFile = File(path);
-      });
+    final isSvg = prefs.getBool(_isSvgKey) ?? false;
+    
+    if (isSvg) {
+      final svgPath = prefs.getString(_svgPathKey);
+      if (svgPath != null && File(svgPath).existsSync()) {
+        setState(() {
+          _svgFilePath = svgPath;
+          _isSvg = true;
+          _imageFile = null;
+        });
+      }
+    } else {
+      final path = prefs.getString(_imagePathKey);
+      if (path != null && File(path).existsSync()) {
+        setState(() {
+          _imageFile = File(path);
+          _isSvg = false;
+          _svgFilePath = null;
+        });
+      }
     }
   }
 
@@ -436,10 +457,103 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
       final rect = target.boundingBox;
       if (rect == null) {
         if (mounted) {
+          setState(() {
+            _showScanningLine = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No detectable bounding box.')),
           );
         }
+        return;
+      }
+
+      // If it's a QR code, generate SVG and display it
+      if (target.format == BarcodeFormat.qrCode && target.rawValue != null) {
+        final qrData = target.rawValue!;
+        final outDir = await getTemporaryDirectory();
+        final svgFile = File(
+          '${outDir.path}/oneqr_svg_${DateTime.now().millisecondsSinceEpoch}.svg',
+        );
+        
+        // Create a visual SVG representation of the QR code
+        final svgSize = 300.0;
+        final padding = 20.0;
+        final contentWidth = svgSize - (padding * 2);
+        
+        String svgContent = '''
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="$svgSize" height="$svgSize" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="qrGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#000000;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#333333;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="white"/>
+  
+  <!-- QR Code Border -->
+  <rect x="$padding" y="$padding" width="$contentWidth" height="$contentWidth" 
+        fill="none" stroke="url(#qrGradient)" stroke-width="3" rx="10"/>
+  
+  <!-- QR Code Title -->
+  <text x="${svgSize/2}" y="${padding + 30}" text-anchor="middle" 
+        font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="black">
+    QR Code
+  </text>
+  
+  <!-- QR Code Data -->
+  <text x="${svgSize/2}" y="${svgSize/2}" text-anchor="middle" 
+        font-family="monospace" font-size="12" fill="black">
+    ${qrData.length > 25 ? qrData.substring(0, 25) + '...' : qrData}
+  </text>
+  
+  <!-- QR Code Pattern (simplified representation) -->
+  <g transform="translate(${padding + 20}, ${padding + 60})">
+    <rect x="0" y="0" width="40" height="40" fill="black"/>
+    <rect x="50" y="0" width="40" height="40" fill="black"/>
+    <rect x="100" y="0" width="40" height="40" fill="black"/>
+    <rect x="150" y="0" width="40" height="40" fill="black"/>
+    <rect x="200" y="0" width="40" height="40" fill="black"/>
+    
+    <rect x="0" y="50" width="40" height="40" fill="black"/>
+    <rect x="100" y="50" width="40" height="40" fill="black"/>
+    <rect x="200" y="50" width="40" height="40" fill="black"/>
+    
+    <rect x="0" y="100" width="40" height="40" fill="black"/>
+    <rect x="50" y="100" width="40" height="40" fill="black"/>
+    <rect x="100" y="100" width="40" height="40" fill="black"/>
+    <rect x="150" y="100" width="40" height="40" fill="black"/>
+    <rect x="200" y="100" width="40" height="40" fill="black"/>
+    
+    <rect x="0" y="150" width="40" height="40" fill="black"/>
+    <rect x="100" y="150" width="40" height="40" fill="black"/>
+    <rect x="200" y="150" width="40" height="40" fill="black"/>
+    
+    <rect x="0" y="200" width="40" height="40" fill="black"/>
+    <rect x="50" y="200" width="40" height="40" fill="black"/>
+    <rect x="100" y="200" width="40" height="40" fill="black"/>
+    <rect x="150" y="200" width="40" height="40" fill="black"/>
+    <rect x="200" y="200" width="40" height="40" fill="black"/>
+  </g>
+</svg>
+''';
+        
+        await svgFile.writeAsString(svgContent);
+        
+        if (!mounted) return;
+        setState(() {
+          _svgFilePath = svgFile.path;
+          _isSvg = true;
+          _imageFile = null;
+          _showScanningLine = false;
+        });
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_svgPathKey, svgFile.path);
+        await prefs.setBool(_isSvgKey, true);
+        await _saveZoomState();
         return;
       }
 
@@ -482,9 +596,12 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
         _currentOffset = Offset.zero;
         _transformationController.value = Matrix4.identity();
         _showScanningLine = false;
+        _isSvg = false;
+        _svgFilePath = null;
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_imagePathKey, outFile.path);
+      await prefs.setBool(_isSvgKey, false);
       await _saveZoomState();
     } catch (e) {
       if (mounted) {
@@ -510,7 +627,9 @@ class _QRImagePageState extends State<QRImagePage> with TickerProviderStateMixin
                     onInteractionUpdate: _onInteractionUpdate,
                     child: GestureDetector(
                       onDoubleTapDown: _onDoubleTapDown,
-                      child: Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
+                      child: _isSvg
+                          ? SvgPicture.file(File(_svgFilePath!), width: 600, height: 800)
+                          : Image.file(_imageFile!, width: 600, height: 800, fit: BoxFit.contain),
                     ),
                   )
                 : Text(AppLocalizations.of(context)!.noQrImageSelected),
