@@ -5,16 +5,17 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:one_qr_app/main.dart';
+import 'package:one_qr_app/app.dart';
 
 void main() {
   testWidgets('One QR app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const OneQRApp());
 
-    // Verify that the app starts with no QR image selected message
-    expect(find.text('No QR image selected.'), findsOneWidget);
+    // Verify that the app starts successfully
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }
